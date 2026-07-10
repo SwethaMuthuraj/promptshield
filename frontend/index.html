@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PromptShield – Secure AI Chat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      background:linear-gradient(135deg,#0f172a 0%,#2e1065 50%,#0f172a 100%);
+      min-height:100vh;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      color:#fff;
+    }
+    #app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    #header{
+      flex-shrink:0;padding:12px 20px;
+      background:rgba(0,0,0,0.4);
+      backdrop-filter:blur(12px);
+      border-bottom:1px solid rgba(255,255,255,0.1);
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .header-left{display:flex;align-items:center;gap:12px}
+    .header-title{font-size:18px;font-weight:700;color:#fff}
+    .header-sub{font-size:11px;color:rgba(167,139,250,0.7);margin-top:2px}
+    .status-pills{display:flex;gap:8px}
+    .pill{
+      display:flex;align-items:center;gap:6px;
+      padding:4px 12px;border-radius:999px;font-size:11px;font-weight:600;
+      border:1px solid;transition:all .3s;
+    }
+    .pill-dot{width:7px;height:7px;border-radius:50%}
+    .pill.ok{background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.4);color:#86efac}
+    .pill.ok .pill-dot{background:#4ade80;animation:pulse 2s infinite}
+    .pill.err{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.4);color:#fca5a5}
+    .pill.err .pill-dot{background:#f87171}
+    .pill.checking{background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.4);color:#fde047}
+    .pill.checking .pill-dot{background:#facc15;animation:pulse 1s infinite}
+    #messages{
+      flex:1;overflow-y:auto;padding:24px 20px;
+      scroll-behavior:smooth;
+    }
+    #messages::-webkit-scrollbar{width:5px}
+    #messages::-webkit-scrollbar-thumb{background:rgba(139,92,246,.4);border-radius:3px}
+    .msgs-inner{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+    .msg-row{display:flex;gap:10px;align-items:flex-end}
+    .msg-row.user{flex-direction:row-reverse}
+    .avatar{
+      width:34px;height:34px;border-radius:50%;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;font-size:16px;
+    }
+    .avatar.user{background:#7c3aed}
+    .avatar.bot{background:linear-gradient(135deg,#3b82f6,#7c3aed)}
+    .bubble{
+      max-width:680px;border-radius:18px;padding:12px 16px;
+      font-size:14px;line-height:1.6;
+    }
+    .bubble.user{
+      background:#7c3aed;color:#fff;border-bottom-right-radius:4px;
+      white-space:pre-wrap;word-break:break-word;
+    }
+    .bubble.bot{
+      background:rgba(255,255,255,0.07);
+      border:1px solid rgba(255,255,255,0.12);
+      color:#e2e8f0;border-bottom-left-radius:4px;
+    }
+    .bubble.blocked{
+      background:rgba(127,29,29,0.6);
+      border:2px solid rgba(239,68,68,0.5);
+      border-radius:16px;padding:14px 16px;max-width:680px;
+    }
+    .bubble.warning-bar{
+      background:rgba(69,26,3,0.5);
+      border:1px solid rgba(245,158,11,0.4);
+      border-radius:12px;padding:8px 14px;
+      color:#fcd34d;font-size:12px;
+      text-align:center;align-self:center;max-width:600px;
+    }
+    .bubble.error-bar{
+      background:rgba(30,30,46,0.8);
+      border:1px solid rgba(100,100,120,0.5);
+      border-radius:16px;padding:12px 16px;
+      color:#f87171;font-size:13px;max-width:500px;
+    }
+    .shield-badge{
+      margin-top:8px;padding-top:8px;
+      border-top:1px solid rgba(255,255,255,0.1);
+      display:flex;gap:12px;font-size:11px;color:rgba(74,222,128,0.7);
+    }
+    .shield-badge span{color:rgba(167,139,250,0.6)}
+    .blocked-grid{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+      margin-top:10px;padding-top:10px;
+      border-top:1px solid rgba(239,68,68,0.2);
+    }
+    .blocked-cell{font-size:11px}
+    .blocked-cell-key{font-family:monospace;color:rgba(248,113,113,0.6);
+      text-transform:uppercase;font-size:10px;margin-bottom:2px}
+    .blocked-cell-val{font-weight:600}
+    .val-unsafe{color:#fca5a5}
+    .val-warn{color:#fcd34d}
+    .val-safe{color:#86efac}
+    .bubble pre{
+      background:rgba(0,0,0,0.4);border-radius:8px;padding:12px;
+      margin:8px 0;overflow-x:auto;font-size:13px;font-family:monospace;
+      color:#6ee7b7;border:1px solid rgba(255,255,255,0.1);
+      white-space:pre;
+    }
+    .bubble code{
+      background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;
+      font-size:13px;font-family:monospace;color:#f9a8d4;
+    }
+    .bubble pre code{background:none;padding:0;color:#6ee7b7}
+    .bubble strong{color:#fff;font-weight:600}
+    .bubble em{color:#c4b5fd}
+    .bubble h1{color:#fff;font-size:18px;font-weight:700;margin:12px 0 6px}
+    .bubble h2{color:#e2e8f0;font-size:16px;font-weight:700;margin:10px 0 4px}
+    .bubble h3{color:#c4b5fd;font-size:14px;font-weight:700;margin:8px 0 4px}
+    .bubble li{margin:3px 0 3px 18px}
+    .bubble ul li{list-style:disc}
+    .bubble ol li{list-style:decimal}
+    .bubble p{margin:6px 0}
+    .cursor{
+      display:inline-block;width:8px;height:16px;
+      background:#a78bfa;margin-left:2px;vertical-align:middle;
+      border-radius:2px;animation:blink .8s infinite;
+    }
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .fade-up{animation:fadeUp .18s ease}
+    .analyzing{
+      display:flex;align-items:center;gap:8px;justify-content:center;
+      background:rgba(79,70,229,0.15);border:1px solid rgba(99,102,241,0.3);
+      border-radius:12px;padding:8px 16px;font-size:12px;color:#a5b4fc;
+      align-self:center;
+    }
+    .analyzing-dots{display:flex;gap:4px}
+    .analyzing-dot{
+      width:6px;height:6px;border-radius:50%;background:#818cf8;
+      animation:bounce 1.2s infinite;
+    }
+    .analyzing-dot:nth-child(2){animation-delay:.2s}
+    .analyzing-dot:nth-child(3){animation-delay:.4s}
+    @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    #pipeline{
+      flex-shrink:0;background:rgba(0,0,0,0.2);
+      border-top:1px solid rgba(255,255,255,0.05);
+      padding:6px 20px;display:none;
+    }
+    .pipeline-inner{
+      max-width:860px;margin:0 auto;
+      display:flex;align-items:center;gap:6px;overflow-x:auto;
+    }
+    .pipeline-label{font-size:11px;color:rgba(167,139,250,0.5);margin-right:4px;white-space:nowrap}
+    .pipe-step{
+      display:flex;align-items:center;gap:4px;
+      padding:3px 8px;border-radius:8px;font-size:11px;white-space:nowrap;
+      transition:all .3s;
+    }
+    .pipe-step.wait{color:rgba(255,255,255,0.2)}
+    .pipe-step.run{
+      background:rgba(59,130,246,0.2);color:#93c5fd;
+      border:1px solid rgba(59,130,246,0.3);
+    }
+    .pipe-step.done{background:rgba(34,197,94,0.08);color:rgba(74,222,128,0.8)}
+    .pipe-step.block{background:rgba(239,68,68,0.15);color:#fca5a5}
+    .pipe-val{font-family:monospace;font-weight:700;margin-left:2px}
+    .pipe-val.unsafe,.pipe-val.blocked{color:#f87171}
+    .pipe-val.warn{color:#fbbf24}
+    .pipe-val.safe,.pipe-val.ok{color:#4ade80}
+    .pipe-sep{color:rgba(255,255,255,0.15);font-size:11px}
+    .pipe-dots{display:flex;gap:2px;margin-left:4px}
+    .pipe-dot{
+      width:4px;height:4px;border-radius:50%;background:#60a5fa;
+      animation:bounce 1.2s infinite;
+    }
+    .pipe-dot:nth-child(2){animation-delay:.15s}
+    .pipe-dot:nth-child(3){animation-delay:.3s}
+    #input-area{
+      flex-shrink:0;padding:16px 20px;
+      background:rgba(0,0,0,0.3);
+      backdrop-filter:blur(12px);
+      border-top:1px solid rgba(255,255,255,0.1);
+    }
+    .input-row{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+    #prompt-input{
+      flex:1;background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.15);border-radius:14px;
+      padding:12px 16px;color:#fff;font-size:14px;
+      resize:none;outline:none;line-height:1.5;
+      font-family:inherit;transition:border-color .15s;
+    }
+    #prompt-input:focus{border-color:rgba(139,92,246,0.6)}
+    #prompt-input::placeholder{color:rgba(167,139,250,0.4)}
+    #prompt-input:disabled{opacity:0.4;cursor:not-allowed}
+    .send-btn{
+      padding:12px 20px;border-radius:14px;border:none;cursor:pointer;
+      font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;
+      transition:all .15s;flex-shrink:0;
+    }
+    .send-btn.go{background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff}
+    .send-btn.go:hover{box-shadow:0 0 20px rgba(124,58,237,0.4)}
+    .send-btn.go:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
+    .send-btn.stop{background:#dc2626;color:#fff}
+    .send-btn.stop:hover{background:#b91c1c}
+    .hint{
+      max-width:860px;margin:6px auto 0;text-align:center;
+      font-size:11px;color:rgba(167,139,250,0.3);
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <div class="header-left">
+      <span style="font-size:26px">🛡️</span>
+      <div>
+        <div class="header-title">PromptShield Chat</div>
+        <div class="header-sub">Pattern → RAG → LLM Classify → Answer</div>
+      </div>
+    </div>
+    <div class="status-pills">
+      <div class="pill checking" id="pill-shield">
+        <div class="pill-dot"></div>
+        <span>Shield …</span>
+      </div>
+      <div class="pill checking" id="pill-ollama">
+        <div class="pill-dot"></div>
+        <span>Ollama …</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="messages">
+    <div class="msgs-inner" id="msgs-inner"></div>
+  </div>
+
+  <div id="pipeline">
+    <div class="pipeline-inner" id="pipeline-inner">
+      <span class="pipeline-label">Pipeline:</span>
+      <div class="pipe-step wait" id="ps-pattern">🔍 Pattern</div>
+      <div class="pipe-sep">→</div>
+      <div class="pipe-step wait" id="ps-rag">📚 RAG</div>
+      <div class="pipe-sep">→</div>
+      <div class="pipe-step wait" id="ps-classify">🧠 Classify</div>
+      <div class="pipe-sep">→</div>
+      <div class="pipe-step wait" id="ps-answer">💬 Answer</div>
+    </div>
+  </div>
+
+  <div id="input-area">
+    <div class="input-row">
+      <textarea
+        id="prompt-input"
+        rows="2"
+        placeholder="Ask anything — cybersecurity, medical, coding, general..."
+      ></textarea>
+      <button class="send-btn go" id="send-btn" disabled>
+        🚀 Send
+      </button>
+    </div>
+    <div class="hint">Enter to send · Shift+Enter for new line · Harmful prompts blocked automatically</div>
+  </div>
+
+</div>
+<script>
+const CHAT_URL   = 'http://localhost:5001/chat';
+const HEALTH_URL = 'http://localhost:5001/health';
+
+let phase        = 'idle';
+let abortCtrl    = null;
+let streamText   = '';
+let history           = [];
+let currentPromptText = '';
+let genId             = 0;  // incremented each send; chunks from old gens are discarded
+let activeReader      = null;
+let streamBubble = null;
+let lastShield   = null;
+
+const msgsEl     = document.getElementById('msgs-inner');
+const inputEl    = document.getElementById('prompt-input');
+const sendBtn    = document.getElementById('send-btn');
+const pipeEl     = document.getElementById('pipeline');
+const pillShield = document.getElementById('pill-shield');
+const pillOllama = document.getElementById('pill-ollama');
+
+// ── Markdown ───────────────────────────────────────────────────────────────
+function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+function renderMd(text) {
+  if (!text) return '';
+  let o = text;
+  o = o.replace(/```(\w*)\n?([\s\S]*?)```/g, (_,l,c) =>
+    `<pre><code>${esc(c.trim())}</code></pre>`);
+  o = o.replace(/`([^`\n]+)`/g, `<code>$1</code>`);
+  o = o.replace(/\*\*\*(.+?)\*\*\*/g, `<strong><em>$1</em></strong>`);
+  o = o.replace(/\*\*(.+?)\*\*/g,     `<strong>$1</strong>`);
+  o = o.replace(/\*(.+?)\*/g,         `<em>$1</em>`);
+  o = o.replace(/^### (.+)/gm, `<h3>$1</h3>`);
+  o = o.replace(/^## (.+)/gm,  `<h2>$1</h2>`);
+  o = o.replace(/^# (.+)/gm,   `<h1>$1</h1>`);
+  o = o.replace(/^[\-\*] (.+)/gm, `<li>$1</li>`);
+  o = o.replace(/^\d+\. (.+)/gm,  `<li>$1</li>`);
+  o = o.replace(/(<li>[\s\S]*?<\/li>)(\n<li>[\s\S]*?<\/li>)*/g, m => `<ul>${m}</ul>`);
+  o = o.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+  if (!o.startsWith('<')) o = `<p>${o}</p>`;
+  return o;
+}
+
+// ── Status pills ───────────────────────────────────────────────────────────
+function setPill(el, state, label) {
+  el.className = `pill ${state}`;
+  el.querySelector('span').textContent = label;
+}
+
+async function checkConnections() {
+  try {
+    const r = await fetch(HEALTH_URL, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      setPill(pillShield, 'ok',  'Shield ✓');
+      setPill(pillOllama, 'ok',  'Ollama ✓');
+    } else {
+      setPill(pillShield, 'err', 'Shield ✗');
+      setPill(pillOllama, 'err', 'Ollama ✗');
+    }
+  } catch {
+    setPill(pillShield, 'err', 'Shield ✗');
+    setPill(pillOllama, 'err', 'Ollama ✗');
+  }
+}
+
+checkConnections();
+setInterval(checkConnections, 15000);
+
+// ── Pipeline bar ───────────────────────────────────────────────────────────
+function setPipeStep(id, status, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = `pipe-step ${status}`;
+  const old = el.querySelector('.pipe-val');
+  if (old) old.remove();
+  const oldDots = el.querySelector('.pipe-dots');
+  if (oldDots) oldDots.remove();
+  if (label) {
+    const v = document.createElement('span');
+    v.className = `pipe-val ${label.toLowerCase()}`;
+    v.textContent = label;
+    el.appendChild(v);
+  }
+  if (status === 'run') {
+    const d = document.createElement('span');
+    d.className = 'pipe-dots';
+    d.innerHTML = '<div class="pipe-dot"></div><div class="pipe-dot"></div><div class="pipe-dot"></div>';
+    el.appendChild(d);
+  }
+}
+
+function showPipeline() {
+  pipeEl.style.display = 'block';
+  setPipeStep('ps-pattern',  'run',  '');
+  setPipeStep('ps-rag',      'run',  '');
+  setPipeStep('ps-classify', 'run',  '');
+  setPipeStep('ps-answer',   'wait', '');
+}
+
+function updatePipelineAfterClassify(evt) {
+  const d  = evt.details || {};
+  const pl = d.pattern?.label || 'SAFE';
+  const rl = d.rag?.label     || 'SAFE';
+  const ol = d.ollama?.label  || 'SAFE';
+  setPipeStep('ps-pattern',  pl==='UNSAFE'?'block':pl==='WARN'?'run':'done', pl);
+  setPipeStep('ps-rag',      rl==='UNSAFE'?'block':rl==='WARN'?'run':'done', rl);
+  setPipeStep('ps-classify', ol==='UNSAFE'?'block':ol==='WARN'?'run':'done', ol);
+  if (evt.label === 'UNSAFE') {
+    setPipeStep('ps-answer', 'block', 'BLOCKED');
+  } else {
+    setPipeStep('ps-answer', 'run', '');
+  }
+}
+
+function finishPipeline(blocked) {
+  if (!blocked) setPipeStep('ps-answer', 'done', 'OK');
+}
+
+// ── DOM helpers ────────────────────────────────────────────────────────────
+function scrollBottom() {
+  const el = document.getElementById('messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+function addMsg(html) {
+  const div = document.createElement('div');
+  div.className = 'fade-up';
+  div.innerHTML = html;
+  msgsEl.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function addUserMsg(text) {
+  addMsg(`
+    <div class="msg-row user">
+      <div class="avatar user">👤</div>
+      <div class="bubble user">${esc(text)}</div>
+    </div>`);
+}
+
+function addBotMsg(content, domain, shieldOk) {
+  const badge = shieldOk !== undefined ? `
+    <div class="shield-badge">
+      🛡️ PromptShield verified
+      ${domain ? `<span>Domain: ${esc(domain)}</span>` : ''}
+    </div>` : '';
+  addMsg(`
+    <div class="msg-row">
+      <div class="avatar bot">🤖</div>
+      <div class="bubble bot">${renderMd(content)}${badge}</div>
+    </div>`);
+}
+
+function addBlockedMsg(reason, details) {
+  let grid = '';
+  if (details) {
+    const keys = ['pattern','rag','ollama'];
+    grid = `<div class="blocked-grid">${keys.map(k => {
+      const lbl = details[k]?.label || '—';
+      const cls = lbl==='UNSAFE'?'val-unsafe':lbl==='WARN'?'val-warn':'val-safe';
+      const sub = details[k]?.matched||(details[k]?.reason||'').slice(0,35)||'';
+      return `<div class="blocked-cell">
+        <div class="blocked-cell-key">${k}</div>
+        <div class="blocked-cell-val ${cls}">${lbl}</div>
+        <div style="font-size:10px;color:rgba(248,113,113,0.5);margin-top:2px">${esc(sub)}</div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+  addMsg(`
+    <div class="msg-row">
+      <div class="bubble blocked">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:20px">🚫</span>
+          <span style="color:#fca5a5;font-weight:700">Blocked by PromptShield</span>
+        </div>
+        <div style="color:#fecaca;font-size:13px;line-height:1.5">${esc(reason)}</div>
+        ${grid}
+      </div>
+    </div>`);
+}
+
+function addWarnMsg(reason) {
+  addMsg(`<div class="bubble warning-bar">⚠️ ${esc(reason)} — Answering with caution.</div>`);
+}
+
+function addErrorMsg(text) {
+  addMsg(`
+    <div class="msg-row">
+      <div class="bubble error-bar">${renderMd(text)}</div>
+    </div>`);
+}
+
+function addAnalyzingIndicator() {
+  return addMsg(`
+    <div class="analyzing">
+      <div class="analyzing-dots">
+        <div class="analyzing-dot"></div>
+        <div class="analyzing-dot"></div>
+        <div class="analyzing-dot"></div>
+      </div>
+      🛡️ PromptShield analyzing...
+    </div>`);
+}
+
+function createStreamBubble() {
+  const uid = 'sbc-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  const wrap = document.createElement('div');
+  wrap.className = 'fade-up';
+  wrap.innerHTML = `
+    <div class="msg-row">
+      <div class="avatar bot">🤖</div>
+      <div class="bubble bot" id="${uid}">
+        <div class="analyzing-dots" style="display:inline-flex;gap:4px;padding:4px 0">
+          <div class="analyzing-dot"></div>
+          <div class="analyzing-dot"></div>
+          <div class="analyzing-dot"></div>
+        </div>
+      </div>
+    </div>`;
+  msgsEl.appendChild(wrap);
+  scrollBottom();
+  return document.getElementById(uid);
+}
+
+// ── Button state ───────────────────────────────────────────────────────────
+function setBtn(state) {
+  if (state === 'stop') {
+    sendBtn.className = 'send-btn stop';
+    sendBtn.innerHTML = '⏹ Stop';
+    sendBtn.disabled  = false;
+    sendBtn.onclick   = handleStop;
+  } else if (state === 'checking') {
+    sendBtn.className = 'send-btn go';
+    sendBtn.innerHTML = '🛡️ Checking...';
+    sendBtn.disabled  = true;
+    sendBtn.onclick   = null;
+  } else {
+    // 'idle'
+    sendBtn.className = 'send-btn go';
+    sendBtn.innerHTML = '🚀 Send';
+    sendBtn.disabled  = !inputEl.value.trim();
+    sendBtn.onclick   = handleSend;
+  }
+}
+
+// ── Input listeners ────────────────────────────────────────────────────────
+inputEl.addEventListener('input', () => {
+  if (phase === 'idle') sendBtn.disabled = !inputEl.value.trim();
+});
+
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (phase === 'idle' && inputEl.value.trim()) handleSend();
+  }
+});
+
+// ── Stop ───────────────────────────────────────────────────────────────────
+function handleStop() {
+  // Cancel fetch and reader — stops ALL incoming chunks immediately
+  genId++;  // invalidate any chunks still in flight
+  abortCtrl?.abort();
+  abortCtrl = null;
+  if (activeReader) { activeReader.cancel().catch(()=>{}); activeReader = null; }
+  if (streamBubble && streamText) {
+    streamBubble.innerHTML = renderMd(streamText + '\n\n*[Stopped]*');
+    const badge = document.createElement('div');
+    badge.className = 'shield-badge';
+    badge.innerHTML = '🛡️ PromptShield verified <span>stopped by user</span>';
+    streamBubble.appendChild(badge);
+  }
+  // Reset history on stop — partial response corrupts Ollama context
+  history           = [];
+  currentPromptText = '';
+  streamText        = '';
+  streamBubble      = null;
+  lastShield        = null;
+  phase             = 'idle';
+  finishPipeline(false);
+  setBtn('idle');
+  inputEl.disabled  = false;
+  inputEl.focus();
+  scrollBottom();
+}
+
+// ── Send ───────────────────────────────────────────────────────────────────
+async function handleSend() {
+
+  const text = inputEl.value.trim();
+  if (!text || phase !== 'idle') return;
+
+  inputEl.value    = '';
+  inputEl.disabled = true;
+  phase            = 'analyzing';
+  setBtn('checking');
+  currentPromptText = text;
+
+  addUserMsg(text);
+  showPipeline();
+  const analyzingEl = addAnalyzingIndicator();
+
+  // Each send gets a unique generation ID.
+  // All event handlers close over myGen and check it before touching the DOM.
+  genId++;
+  const myGen = genId;
+
+  streamText   = '';
+  streamBubble = null;
+  lastShield   = null;
+
+  // Cancel any previous fetch
+  abortCtrl?.abort();
+  abortCtrl = new AbortController();
+
+  try {
+    const resp = await fetch(CHAT_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ prompt: text, history: history }),
+      signal:  abortCtrl.signal
+    });
+
+    if (!resp.ok) throw new Error(`Backend returned ${resp.status}`);
+
+    const reader  = resp.body.getReader();
+    activeReader  = reader;
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // If a newer request started, stop processing this stream entirely
+      if (myGen !== genId) { reader.cancel().catch(()=>{}); break; }
+
+      buf += decoder.decode(value, { stream: true });
+
+      let lineEnd;
+      while ((lineEnd = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, lineEnd).trim();
+        buf = buf.slice(lineEnd + 2);
+
+        if (!block.startsWith('data:')) continue;
+        if (myGen !== genId) break outer; // stale, stop immediately
+
+        let evt;
+        try { evt = JSON.parse(block.slice(5).trim()); }
+        catch { continue; }
+
+        /* ── CLASSIFICATION ── */
+        if (evt.type === 'classification') {
+          analyzingEl.remove();
+          updatePipelineAfterClassify(evt);
+
+          if (evt.label === 'UNSAFE') {
+            addBlockedMsg(evt.reason, evt.details);
+            finishPipeline(true);
+            currentPromptText = '';
+            phase = 'idle';
+            inputEl.disabled = false;
+            setBtn('idle');
+            return;
+          }
+
+          if (evt.label === 'WARN') addWarnMsg(evt.reason);
+          lastShield   = evt;
+          phase        = 'answering';
+          streamBubble = createStreamBubble();
+          setBtn('stop');
+          continue;
+        }
+
+        /* ── CHUNK ── */
+        if (evt.type === 'chunk') {
+          if (!streamBubble) streamBubble = createStreamBubble();
+          streamText += evt.text;
+          streamBubble.innerHTML = renderMd(streamText) + '<span class="cursor"></span>';
+          scrollBottom();
+          continue;
+        }
+
+        /* ── DONE ── */
+        if (evt.type === 'done') {
+          if (streamBubble) {
+            const domain = lastShield?.details?.ollama?.domain || 'general';
+            streamBubble.innerHTML = renderMd(streamText);
+            const badge = document.createElement('div');
+            badge.className = 'shield-badge';
+            badge.innerHTML = `\u{1F6E1}\uFE0F PromptShield verified <span>Domain: ${esc(domain)}</span>`;
+            streamBubble.appendChild(badge);
+          }
+          history.push({ role: 'user',      content: text });
+          history.push({ role: 'assistant', content: streamText });
+          currentPromptText = '';
+          streamText   = '';
+          streamBubble = null;
+          lastShield   = null;
+          activeReader = null;
+          finishPipeline(false);
+          phase = 'idle';
+          inputEl.disabled = false;
+          setBtn('idle');
+          scrollBottom();
+          return;
+        }
+      }
+    }
+
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      analyzingEl?.remove();
+      addErrorMsg('⚠️ Connection error: ' + err.message +
+        '\n\nMake sure Flask is running on port 5001.');
+    }
+    phase = 'idle';
+    inputEl.disabled = false;
+    setBtn('idle');
+  }
+}
+
+// ── Welcome ────────────────────────────────────────────────────────────────
+addBotMsg(`Hello! I'm your **PromptShield-protected** AI assistant. 🛡️
+
+**I can help you with:**
+- 🔐 Cybersecurity — malware, attacks, defenses, CTF
+- 🏥 Medical — symptoms, drug mechanisms, treatments
+- 💻 Coding — any language, debugging, algorithms
+- 🧠 General — science, history, math, writing, anything
+
+Every message goes through: **Pattern → RAG → LLM Classify → Answer**
+
+Educational questions are always welcome. Harmful prompts are blocked automatically.`);
+
+setBtn('idle');
+inputEl.focus();
+</script>
+</body>
+</html>

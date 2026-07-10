@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'; object-src 'none';">
+  <title>PromptShield</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+
+    body {
+      width: 320px;
+      background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 60%, #0f172a 100%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      background: rgba(0,0,0,.25);
+    }
+    .logo { font-size: 26px; line-height: 1 }
+    .title { font-size: 15px; font-weight: 700 }
+    .subtitle { font-size: 11px; color: #a78bfa; margin-top: 1px }
+
+    /* status pill */
+    .pill {
+      margin-left: auto;
+      padding: 4px 11px; border-radius: 999px;
+      font-size: 11px; font-weight: 700;
+      border: 1px solid;
+      transition: all .25s;
+    }
+    .pill.on  { background: rgba(22,101,52,.5);  color: #86efac; border-color: #22c55e }
+    .pill.off { background: rgba(127,29,29,.5);  color: #fca5a5; border-color: #ef4444 }
+
+    /* ── Sections ── */
+    .section {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    .sec-title {
+      font-size: 10px; font-weight: 700; color: #a78bfa;
+      text-transform: uppercase; letter-spacing: .06em;
+      margin-bottom: 10px;
+    }
+
+    /* ── Toggle rows ── */
+    .row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      margin-bottom: 9px;
+    }
+    .row:last-of-type { margin-bottom: 0 }
+    .lbl { font-size: 13px; color: #e2e8f0 }
+
+    .toggle { position: relative; width: 38px; height: 22px; cursor: pointer; flex-shrink: 0 }
+    .toggle input { opacity: 0; width: 0; height: 0 }
+    .slider {
+      position: absolute; inset: 0;
+      background: #334155; border-radius: 999px; transition: .2s;
+    }
+    .slider::before {
+      content: ''; position: absolute;
+      width: 16px; height: 16px;
+      left: 3px; bottom: 3px;
+      background: #fff; border-radius: 50%; transition: .2s;
+    }
+    input:checked + .slider { background: #7c3aed }
+    input:checked + .slider::before { transform: translateX(16px) }
+
+    /* ── URL input ── */
+    .inp-grp { margin-top: 11px }
+    .inp-grp label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px }
+    .inp-grp input {
+      width: 100%;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 6px;
+      padding: 7px 10px; color: #fff; font-size: 12px; outline: none;
+      transition: border-color .15s;
+    }
+    .inp-grp input:focus { border-color: #7c3aed }
+
+    /* backend status */
+    #bs { font-size: 11px; margin-top: 6px; min-height: 16px }
+    .on  { color: #4ade80 }
+    .err { color: #f87171 }
+
+    /* ── Stats ── */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+    .card {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px; padding: 10px; text-align: center;
+    }
+    .num { font-size: 22px; font-weight: 700; color: #c084fc }
+    .card-lbl { font-size: 10px; color: #94a3b8; margin-top: 2px }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%; padding: 9px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+      margin-top: 8px; transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85 }
+    .btn-primary { background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff }
+    .btn-outline  { background: transparent; border: 1px solid rgba(255,255,255,.2); color: #e2e8f0 }
+    .btn-danger   { background: rgba(127,29,29,.5); border: 1px solid #ef4444; color: #fca5a5 }
+
+    /* ── Logs ── */
+    .logs {
+      max-height: 120px; overflow-y: auto;
+      background: rgba(0,0,0,.3); border-radius: 6px;
+      padding: 8px; margin-top: 6px;
+    }
+    .logs::-webkit-scrollbar { width: 4px }
+    .logs::-webkit-scrollbar-thumb { background: rgba(139,92,246,.4); border-radius: 2px }
+    .log {
+      padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.06);
+      color: #fca5a5; font-size: 11px; line-height: 1.4;
+    }
+    .log:last-child { border-bottom: none }
+    .log-time { color: #64748b; font-size: 10px }
+
+    .footer {
+      padding: 9px 16px; text-align: center;
+      font-size: 10px; color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">🛡️</div>
+  <div>
+    <div class="title">PromptShield</div>
+    <div class="subtitle">LLM Prompt Firewall</div>
+  </div>
+  <div class="pill on" id="pill">Active</div>
+</div>
+
+<!-- Settings -->
+<div class="section">
+  <div class="sec-title">Settings</div>
+
+  <div class="row">
+    <span class="lbl">Enable PromptShield</span>
+    <label class="toggle"><input type="checkbox" id="en" checked><span class="slider"></span></label>
+  </div>
+  <div class="row">
+    <span class="lbl">Block UNSAFE prompts</span>
+    <label class="toggle"><input type="checkbox" id="blk" checked><span class="slider"></span></label>
+  </div>
+  <div class="row">
+    <span class="lbl">Show WARN banners</span>
+    <label class="toggle"><input type="checkbox" id="wrn" checked><span class="slider"></span></label>
+  </div>
+
+  <div class="inp-grp">
+    <label>Backend URL</label>
+    <input type="text" id="url" placeholder="http://localhost:5001"/>
+  </div>
+
+  <div id="bs">Checking…</div>
+  <button class="btn btn-primary" id="save">Save Settings</button>
+</div>
+
+<!-- Stats -->
+<div class="section">
+  <div class="sec-title">Stats</div>
+  <div class="grid">
+    <div class="card">
+      <div class="num" id="total">0</div>
+      <div class="card-lbl">Total Blocked</div>
+    </div>
+    <div class="card">
+      <div class="num" id="session">0</div>
+      <div class="card-lbl">This Session</div>
+    </div>
+  </div>
+  <button class="btn btn-danger" id="clear-stats" style="margin-top:8px">✕ Clear Stats</button>
+</div>
+
+<!-- Recent blocked -->
+<div class="section">
+  <div class="sec-title">Recent Blocked Prompts</div>
+  <div class="logs" id="logs">
+    <div style="color:#475569;text-align:center;padding:8px">Loading…</div>
+  </div>
+  <button class="btn btn-outline" id="refresh">↻ Refresh Logs</button>
+</div>
+
+<div class="footer">PromptShield v1.0 — Securing your LLM sessions</div>
+
+<script>
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  async function checkBackend(url) {
+    const el = document.getElementById("bs");
+    el.innerHTML = "Checking…";
+    try {
+      const r = await fetch(url + "/health", { signal: AbortSignal.timeout(3000) });
+      el.innerHTML = r.ok
+        ? '<span class="on">✓ Backend online</span>'
+        : '<span class="err">✗ Backend error</span>';
+    } catch {
+      el.innerHTML = '<span class="err">✗ Offline — local patterns active</span>';
+    }
+  }
+
+  async function loadLogs(url) {
+    const box = document.getElementById("logs");
+    try {
+      const r = await fetch(url + "/logs?n=10", { signal: AbortSignal.timeout(4000) });
+      const { logs } = await r.json();
+      if (!logs.length) {
+        box.innerHTML = '<div style="color:#475569;text-align:center;padding:8px">No blocks yet</div>';
+        return;
+      }
+      box.innerHTML = logs.map(l => {
+        const ts = (() => {
+          try { return new Date(l.timestamp).toLocaleTimeString(); }
+          catch { return l.timestamp; }
+        })();
+        const preview = l.prompt.length > 72 ? l.prompt.substring(0, 72) + "…" : l.prompt;
+        return `<div class="log">
+          <div class="log-time">${ts}</div>
+          <div>${preview}</div>
+        </div>`;
+      }).join("");
+    } catch {
+      box.innerHTML = '<div style="color:#475569;text-align:center;padding:8px">Cannot reach backend</div>';
+    }
+  }
+
+  function updatePill(enabled) {
+    const pill = document.getElementById("pill");
+    pill.textContent = enabled ? "Active" : "Paused";
+    pill.className   = `pill ${enabled ? "on" : "off"}`;
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  async function init() {
+    const s = await chrome.storage.sync.get(null);
+
+    document.getElementById("en").checked  = s.enabled      ?? true;
+    document.getElementById("blk").checked = s.blockUnsafe  ?? true;
+    document.getElementById("wrn").checked = s.warnUser     ?? true;
+    document.getElementById("url").value   = s.backendUrl   || "http://localhost:5001";
+    document.getElementById("total").textContent   = s.logCount     || 0;
+    document.getElementById("session").textContent = s.sessionCount || 0;
+
+    updatePill(s.enabled ?? true);
+
+    const url = s.backendUrl || "http://localhost:5001";
+    checkBackend(url);
+    loadLogs(url);
+  }
+
+  // ── Save settings ────────────────────────────────────────────────────────
+  document.getElementById("save").addEventListener("click", async () => {
+    const url     = document.getElementById("url").value.trim();
+    const enabled = document.getElementById("en").checked;
+
+    await chrome.storage.sync.set({
+      enabled:     enabled,
+      blockUnsafe: document.getElementById("blk").checked,
+      warnUser:    document.getElementById("wrn").checked,
+      backendUrl:  url,
+    });
+
+    // Push state change to all active LLM tabs immediately
+    chrome.runtime.sendMessage({
+      type:       "SETTINGS_CHANGED",
+      enabled:    enabled,
+      backendUrl: url,
+    });
+
+    checkBackend(url);
+    const btn = document.getElementById("save");
+    btn.textContent = "✓ Saved!";
+    setTimeout(() => { btn.textContent = "Save Settings"; }, 1500);
+  });
+
+  // ── Clear stats ──────────────────────────────────────────────────────────
+  document.getElementById("clear-stats").addEventListener("click", async () => {
+    await chrome.storage.sync.set({ logCount: 0, sessionCount: 0 });
+    document.getElementById("total").textContent   = "0";
+    document.getElementById("session").textContent = "0";
+    chrome.action.setBadgeText({ text: "" });
+  });
+
+  // ── Refresh logs ─────────────────────────────────────────────────────────
+  document.getElementById("refresh").addEventListener("click", () => {
+    loadLogs(document.getElementById("url").value.trim());
+  });
+
+  // ── Toggle pill live ─────────────────────────────────────────────────────
+  document.getElementById("en").addEventListener("change", (e) => {
+    updatePill(e.target.checked);
+  });
+
+  init();
+</script>
+</body>
+</html>

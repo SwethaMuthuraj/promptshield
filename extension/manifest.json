@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "PromptShield – LLM Prompt Firewall",
+  "version": "1.0.1",
+  "description": "Blocks harmful and jailbreak prompts on ChatGPT, Gemini, Claude, Copilot, Sider, Monica, and all LLM apps.",
+  "permissions": ["activeTab", "storage", "scripting", "tabs"],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://claude.ai/*",
+    "https://copilot.microsoft.com/*",
+    "https://www.bing.com/chat*",
+    "https://poe.com/*",
+    "https://you.com/*",
+    "https://perplexity.ai/*",
+    "https://sider.ai/*",
+    "https://monica.im/*",
+    "http://localhost:*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://poe.com/*",
+        "https://you.com/*",
+        "https://perplexity.ai/*",
+        "https://sider.ai/*",
+        "https://monica.im/*",
+        "http://localhost:*/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": { "service_worker": "background.js" },
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
