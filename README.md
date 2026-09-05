@@ -106,7 +106,7 @@ The server starts on `http://localhost:5001` by default.
 4. PromptShield now runs automatically on ChatGPT, Gemini, Claude, Copilot, etc.
 
 ### 4. (Optional) Use the standalone web chat
-Open `frontend/index.html` in your browser — it connects to the same backend and gives you a fully protected chat experience with live pipeline visualization.
+Open `frontend/index.html` in browser — it connects to the same backend and gives you a fully protected chat experience with live pipeline visualization.
 
 ---
 
